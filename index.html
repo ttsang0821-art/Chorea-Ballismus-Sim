@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chorea–Ballismus Simulator</title>
+<meta name="description" content="Interactive teaching simulation of bilateral left-greater-than-right chorea-ballismus in diabetic striatopathy. Simulation, not patient footage.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one-screen teaching bench. 3D viewport on the left, instrument panel on the right; stacks on phones. */
+:root{
+  --bg:#E6ECEA; --panel:#F4F7F6; --ink:#15242A; --muted:#55696E; --line:#C4D0CD;
+  --accent:#1C6670; --accent-ink:#FFFFFF;
+  --left:#B2482A; --right:#2C5996;
+  --scene-bg:#D6DFDC; --floor:#C2CDC9; --floor-line:#A3B1AD;
+  --sim:#8A2F18; --sim-bg:#F7E4DC;
+  --f-display:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10181A; --panel:#162124; --ink:#E2EAE8; --muted:#93A5A7; --line:#2A3A3D;
+    --accent:#5DB1B9; --accent-ink:#0C1A1C;
+    --left:#E3835F; --right:#82A7DE;
+    --scene-bg:#152023; --floor:#1C292C; --floor-line:#2F4043;
+    --sim:#F2B49C; --sim-bg:#3A2219;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10181A; --panel:#162124; --ink:#E2EAE8; --muted:#93A5A7; --line:#2A3A3D;
+  --accent:#5DB1B9; --accent-ink:#0C1A1C;
+  --left:#E3835F; --right:#82A7DE;
+  --scene-bg:#152023; --floor:#1C292C; --floor-line:#2F4043;
+  --sim:#F2B49C; --sim-bg:#3A2219;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;height:100%;padding-inline:16px;padding-block:16px}
+.stage{position:relative;min-width:0;min-height:0;border-radius:10px;overflow:hidden;background:var(--scene-bg);border:1px solid var(--line)}
+.stage canvas#view3d{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.stage canvas#view3d:active{cursor:grabbing}
+.sim-badge{position:absolute;top:12px;left:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;max-width:calc(100% - 24px);background:var(--sim-bg);color:var(--sim);border:1px solid color-mix(in srgb,var(--sim) 35%,transparent);border-radius:6px;padding:5px 9px;font:500 11px/1.35 var(--f-mono);letter-spacing:.02em;pointer-events:none}
+.sim-badge strong{text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+.view-chip{position:absolute;top:12px;right:12px;font:500 11px var(--f-mono);color:var(--muted);background:color-mix(in srgb,var(--panel) 80%,transparent);border:1px solid var(--line);border-radius:6px;padding:4px 8px;pointer-events:none}
+.side-tag{position:absolute;left:0;top:0;transform:translate(-50%,-50%);font:600 11px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:5px;background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid currentColor;pointer-events:none;white-space:nowrap}
+#tagL{color:var(--left)} #tagR{color:var(--right)}
+.hint{position:absolute;left:12px;bottom:12px;font:11px var(--f-mono);color:var(--muted);pointer-events:none}
+.fab{position:absolute;right:12px;bottom:12px;font:600 13px var(--f-body);background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:9px 16px;cursor:pointer}
+.fab:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.clock{position:absolute;right:12px;top:42px;font:500 11px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none}
+.fail{position:absolute;inset:auto 16px 50% 16px;text-align:center;color:var(--ink)}
+
+.panel{min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:18px;padding-right:6px;scrollbar-width:thin}
+.eyebrow{font:500 11px/1.3 var(--f-mono);letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin:0}
+h1{font-family:var(--f-display);font-weight:600;font-size:27px;line-height:1.12;margin:6px 0 8px;text-wrap:balance}
+h1 .lr{color:var(--left)}
+.lede{color:var(--muted);margin:0;max-width:62ch}
+.block{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:12px}
+.block h2{font:600 11.5px/1.2 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+.ctl{display:grid;gap:3px}
+.ctl-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ctl label{font-weight:500}
+output{font:500 12px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--ink);text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent);margin:2px 0}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);border-radius:7px;overflow:hidden;position:relative}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{text-align:center;padding:7px 4px;cursor:pointer;font-size:13px;border-right:1px solid var(--line);background:var(--panel)}
+.seg label:last-of-type{border-right:0}
+.seg input:checked+label{background:var(--accent);color:var(--accent-ink)}
+.seg input:focus-visible+label{outline:2px solid var(--ink);outline-offset:-3px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:500 13px var(--f-body);padding:7px 12px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.btn.l{color:var(--left)} .btn.r{color:var(--right)}
+.check{display:flex;gap:8px;align-items:center;cursor:pointer}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+
+.measures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.metric{display:flex;flex-direction:column;gap:2px;min-width:0}
+.metric b{font:500 30px/1 var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.metric span{font-size:12px;color:var(--muted)}
+.metric .lv{color:var(--left)} .metric .rv{color:var(--right)}
+.chartwrap{display:flex;flex-direction:column;gap:4px}
+canvas#chart{width:100%;height:112px;display:block}
+.legend{display:flex;gap:14px;font:11px var(--f-mono);color:var(--muted);flex-wrap:wrap}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+.legend .L i{background:var(--left)} .legend .R i{background:var(--right)}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font:12px/1.45 var(--f-mono);min-height:7.4em}
+.log li{display:flex;gap:8px;align-items:baseline}
+.log .t{color:var(--muted);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.log .L{color:var(--left)} .log .R{color:var(--right)}
+.log .empty{color:var(--muted)}
+
+.notes{margin:0;display:flex;flex-direction:column;gap:10px}
+.notes div{display:grid;gap:1px}
+.notes dt{font-weight:600}
+.notes dd{margin:0;color:var(--muted);max-width:62ch}
+.prose{margin:0;color:var(--muted);max-width:62ch}
+.prose strong{color:var(--ink);font-weight:600}
+ul.prose{padding-left:18px;display:flex;flex-direction:column;gap:6px}
+footer.small{font:11px/1.5 var(--f-mono);color:var(--muted);border-top:1px solid var(--line);padding-top:12px;padding-bottom:4px}
+
+@media (max-width:560px){
+  .view-chip{top:auto;bottom:58px}
+  .clock{display:none}
+  .hint{max-width:calc(100% - 120px)}
+}
+@media (max-width:880px){
+  html,body{height:auto}
+  .app{grid-template-columns:minmax(0,1fr);height:auto}
+  .stage{height:66svh;min-height:400px}
+  .panel{overflow:visible;padding-right:0}
+  h1{font-size:23px}
+}
+@media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto} }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <section class="stage" id="stage" aria-label="3D simulation viewport">
+    <div class="sim-badge"><strong>Simulation</strong><span>Procedurally generated model · not patient footage</span></div>
+    <div class="view-chip" id="viewChip">Frontal view</div>
+    <div class="clock" id="clock">t = 0.0 s</div>
+    <div class="side-tag" id="tagR">Patient R</div>
+    <div class="side-tag" id="tagL">Patient L</div>
+    <div class="hint">Drag to rotate · scroll or pinch to zoom</div>
+    <button class="fab" id="fab" type="button">Pause</button>
+  </section>
+
+  <aside class="panel">
+    <header>
+      <p class="eyebrow">Hyperglycemic movement disorder · teaching model</p>
+      <h1>Bilateral chorea–ballismus, <span class="lr">left&nbsp;&gt;&nbsp;right</span></h1>
+      <p class="lede">Diabetic striatopathy with severely uncontrolled diabetes mellitus. Every movement is generated live from random events, so the sequence never repeats.</p>
+    </header>
+
+    <section class="block" aria-labelledby="h-ctl">
+      <h2 id="h-ctl">Movement</h2>
+      <div class="ctl">
+        <div class="ctl-head"><label for="sev">Severity</label><output id="sevOut" for="sev">Moderate · 1.00</output></div>
+        <input type="range" id="sev" min="0" max="1.5" step="0.05" value="1">
+      </div>
+      <div class="ctl">
+        <div class="ctl-head"><label for="asym">Left : right asymmetry</label><output id="asymOut" for="asym">L 45% greater</output></div>
+        <input type="range" id="asym" min="0" max="80" step="5" value="45">
+      </div>
+      <div class="ctl">
+        <div class="ctl-head"><label for="speed">Playback speed</label><output id="speedOut" for="speed">1.00×</output></div>
+        <input type="range" id="speed" min="0.25" max="1.5" step="0.05" value="1">
+      </div>
+      <div class="seg" role="radiogroup" aria-label="Movement component">
+        <input type="radio" name="mode" id="m-both" value="both" checked><label for="m-both">Both</label>
+        <input type="radio" name="mode" id="m-chorea" value="chorea"><label for="m-chorea">Chorea only</label>
+        <input type="radio" name="mode" id="m-ball" value="ball"><label for="m-ball">Ballismus only</label>
+      </div>
+      <div class="row">
+        <button class="btn" id="pauseBtn" type="button">Pause</button>
+        <button class="btn l" id="flingL" type="button">Trigger left fling</button>
+        <button class="btn r" id="flingR" type="button">Trigger right fling</button>
+      </div>
+      <label class="check"><input type="checkbox" id="marks" checked> Ring each ballistic event at its origin joint</label>
+    </section>
+
+    <section class="block" aria-labelledby="h-cam">
+      <h2 id="h-cam">Camera</h2>
+      <div class="row" id="views">
+        <button class="btn" type="button" data-view="front" aria-pressed="true">Frontal</button>
+        <button class="btn" type="button" data-view="left" aria-pressed="false">Left lateral</button>
+        <button class="btn" type="button" data-view="right" aria-pressed="false">Right lateral</button>
+        <button class="btn" type="button" data-view="oblique" aria-pressed="false">Oblique</button>
+      </div>
+      <label class="check"><input type="checkbox" id="autorot"> Slowly orbit the patient</label>
+    </section>
+
+    <section class="block" aria-labelledby="h-meas">
+      <h2 id="h-meas">Live measures</h2>
+      <div class="measures">
+        <div class="metric"><b id="ratio">—</b><span>Choreiform amplitude, L : R (rolling 12 s). Target <span id="ratioTarget">1.45</span></span></div>
+        <div class="metric"><b><span class="lv" id="cntL">0</span> : <span class="rv" id="cntR">0</span></b><span>Ballistic flings, L : R (last 60 s)</span></div>
+      </div>
+      <div class="chartwrap">
+        <canvas id="chart" aria-label="Strip chart of summed limb angular speed for each side over the last 10 seconds"></canvas>
+        <div class="legend"><span class="L"><i></i>Left limbs</span><span class="R"><i></i>Right limbs</span><span>Summed joint speed, last 10 s</span></div>
+      </div>
+      <ul class="log" id="log" aria-live="polite"><li class="empty">Proximal events will be listed here as they occur.</li></ul>
+    </section>
+
+    <section class="block" aria-labelledby="h-look">
+      <h2 id="h-look">What to look for</h2>
+      <dl class="notes">
+        <div><dt>Chorea</dt><dd>Brief movements of about 0.15–0.7 s that flow from one joint to the next. They are most frequent in the fingers, wrists, toes and ankles, with intermittent elbow and knee involvement and shoulder shrugs.</dd></div>
+        <div><dt>Ballismus</dt><dd>Sudden, large flings that start at the shoulder or hip. Onset is fast and the return is slower, with a passive whip of the wrist and fingers.</dd></div>
+        <div><dt>Not tremor</dt><dd>Event timing is random (Poisson), so intervals never settle into a frequency. Watch the strip chart: there is no periodicity.</dd></div>
+        <div><dt>Not dystonia</dt><dd>Every excursion returns toward rest. No posture is held.</dd></div>
+        <div><dt>Not myoclonus</dt><dd>Myoclonic jerks are shock-like and usually under 100 ms. These movements are longer and smoother.</dd></div>
+        <div><dt>Not a seizure</dt><dd>The head stays upright and oriented, the limbs move out of sync, and nothing evolves through tonic and clonic phases.</dd></div>
+        <div><dt>Not voluntary</dt><dd>There is no goal or rhythm. Postural corrections lag the movement and are not anticipatory. A reactive step sometimes follows a large fling.</dd></div>
+      </dl>
+    </section>
+
+    <section class="block" aria-labelledby="h-clin">
+      <h2 id="h-clin">Clinical correlation</h2>
+      <ul class="prose">
+        <li><strong>Laterality.</strong> Most reported cases are unilateral (hemichorea–hemiballismus); bilateral involvement is less common.</li>
+        <li><strong>Imaging.</strong> CT hyperdensity and T1 hyperintensity of the putamen, with or without the caudate, lie contralateral to the affected limbs. Left-greater-than-right movements predict right-greater-than-left striatal signal.</li>
+        <li><strong>Course.</strong> Movements often improve as glucose is corrected. Some patients need symptomatic therapy when movements persist.</li>
+        <li><strong>Rehabilitation.</strong> The main risks are falls from leg flings and reactive steps, and limb injury from striking bed rails or furniture. Plan for padding, supervised mobility and a safe environment.</li>
+      </ul>
+    </section>
+
+    <footer class="small">Model: 45 independently driven joint channels. Random events are shaped as smooth pulses, then passed through spring–damper filters within joint limits. The feet are held in place by analytic two-bone leg IK. Left-side event amplitude is scaled by the asymmetry setting, and left ballistic events are also more frequent. For education only.</footer>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const T=window.THREE;
+const stage=$('stage');
+if(!T){stage.insertAdjacentHTML('beforeend','<p class="fail">The 3D library did not load. Check the connection and reload the page.</p>');return;}
+
+/* ---------- helpers ---------- */
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const pick=a=>a[(Math.random()*a.length)|0];
+const expo=r=>-Math.log(1-Math.random())/Math.max(r,1e-3);
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(6.283185307*v);}
+const smoother=u=>u<=0?0:u>=1?1:u*u*u*(u*(u*6-15)+10);
+function bump(u,p){if(u<=0||u>=1)return 0;return u<p?smoother(u/p):smoother((1-u)/(1-p));}
+function softClamp(v,lo,hi){const m=Math.min(.12*(hi-lo),.15);if(v>hi-m)return hi-m+m*Math.tanh((v-hi+m)/m);if(v<lo+m)return lo+m-m*Math.tanh((lo+m-v)/m);return v;}
+const smoothstep=(a,b,x)=>{const u=clamp((x-a)/(b-a),0,1);return u*u*(3-2*u);};
+const other=S=>S==='L'?'R':'L';
+
+/* ---------- state ---------- */
+const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const state={sev:1,asym:.45,speed:1,mode:'both',paused:false,marks:true,t:0};
+const gain=S=>S==='L'?state.sev*(1+state.asym):S==='R'?state.sev:state.sev*(1+state.asym*.5);
+const chorOn=()=>state.mode!=='ball';
+const ballOn=()=>state.mode!=='chorea';
+
+/* ---------- renderer / scene ---------- */
+const renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
+renderer.domElement.id='view3d';
+stage.prepend(renderer.domElement);
+const scene=new T.Scene();scene.background=new T.Color('#d6dfdc');
+const camera=new T.PerspectiveCamera(30,1,.05,60);
+
+scene.add(new T.HemisphereLight(0xffffff,0x7d8a85,.42));
+const key=new T.DirectionalLight(0xffffff,.72);key.position.set(1.7,3.8,2.9);key.castShadow=true;
+key.shadow.mapSize.set(1024,1024);Object.assign(key.shadow.camera,{left:-1.6,right:1.6,top:2.3,bottom:-.5,near:.5,far:10});
+key.shadow.bias=-.0012;key.shadow.normalBias=.035;key.target.position.set(0,.9,0);scene.add(key,key.target);
+const fill=new T.DirectionalLight(0xe2ebff,.24);fill.position.set(-2.6,1.9,1.6);scene.add(fill);
+const rim=new T.DirectionalLight(0xffffff,.22);rim.position.set(0,2.6,-3.2);scene.add(rim);
+
+const floorMat=new T.MeshStandardMaterial({color:'#c2cdc9',roughness:1,metalness:0});
+const floor=new T.Mesh(new T.CircleGeometry(5,72),floorMat);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+const lineMat=new T.LineBasicMaterial({color:'#a3b1ad'});
+for(let r=.5;r<=3;r+=.5){const p=[];for(let i=0;i<=120;i++){const a=i/120*Math.PI*2;p.push(new T.Vector3(Math.cos(a)*r,.0015,Math.sin(a)*r));}scene.add(new T.Line(new T.BufferGeometry().setFromPoints(p),lineMat));}
+scene.add(new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(0,.0015,-3),new T.Vector3(0,.0015,3)]),lineMat));
+scene.add(new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(-3,.0015,0),new T.Vector3(3,.0015,0)]),lineMat));
+
+/* ---------- materials & geometry ---------- */
+const Mt=(c,r)=>new T.MeshStandardMaterial({color:c,roughness:r,metalness:0});
+const skin=Mt('#c4937a',.66),gown=Mt('#86a3b4',.93),shorts=Mt('#38475a',.9),hair=Mt('#231d1a',.82),dark=Mt('#17120f',.35),lip=Mt('#a0605a',.6);
+const SPH=new T.SphereGeometry(1,28,20);
+const capCache={};
+const capG=(r,l)=>capCache[r+'_'+l]||(capCache[r+'_'+l]=new T.CapsuleGeometry(r,l,5,12));
+function mesh(geo,mat,parent,pos,scale,rot){const m=new T.Mesh(geo,mat);if(pos)m.position.set(pos[0],pos[1],pos[2]);if(scale)m.scale.set(scale[0],scale[1],scale[2]);if(rot)m.rotation.set(rot[0],rot[1],rot[2]);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
+function cyl(rt,rb,len,mat,parent,y0){return mesh(new T.CylinderGeometry(rt,rb,len,22,1),mat,parent,[0,y0-len/2,0]);}
+function grp(parent,pos){const g=new T.Group();if(pos)g.position.set(pos[0],pos[1],pos[2]);parent.add(g);return g;}
+const markers=[];
+function marker(parent,S,pos){const m=new T.Mesh(new T.TorusGeometry(.105,.0075,10,48),new T.MeshBasicMaterial({color:S==='L'?'#b2482a':'#2c5996',transparent:true,opacity:0,depthWrite:false}));if(pos)m.position.set(pos[0],pos[1],pos[2]);m.userData={life:0,S};m.renderOrder=5;parent.add(m);markers.push(m);return m;}
+
+/* ---------- rig (meters; patient faces +Z; patient's LEFT is +X) ---------- */
+const A_TH=.45,B_SH=.43,ANK=.074,BALL=.13,HEEL=.07,HIP_X=.092,HIP_Y=-.06;
+const PELV_Y=ANK-HIP_Y+(A_TH+B_SH)*.988;
+const root=grp(scene);
+const pelvis=grp(root,[0,PELV_Y,0]);pelvis.rotation.order='YXZ';
+mesh(SPH,shorts,pelvis,[0,-.012,0],[.172,.118,.116]);
+const spine=grp(pelvis,[0,.09,0]);
+mesh(capG(.145,.08),gown,spine,[0,.07,.002],[1.02,1,.72]);
+const chest=grp(spine,[0,.16,0]);
+mesh(capG(.15,.12),gown,chest,[0,.14,0],[1.12,1,.74]);
+const neck=grp(chest,[0,.29,-.008]);
+cyl(.05,.055,.1,skin,neck,.09);
+const head=grp(neck,[0,.075,0]);
+mesh(SPH,skin,head,[0,.11,.005],[.088,.112,.1]);
+mesh(SPH,skin,head,[0,.05,.025],[.07,.055,.072]);
+mesh(new T.SphereGeometry(1,28,16,0,Math.PI*2,0,Math.PI*.56),hair,head,[0,.118,-.006],[.094,.114,.107],[-.28,0,0]);
+for(const s of [1,-1]){mesh(SPH,skin,head,[s*.087,.105,-.006],[.016,.03,.022]);mesh(SPH,hair,head,[s*.033,.146,.091],[.021,.005,.007]);}
+const eyes=[mesh(SPH,dark,head,[.032,.123,.094],[.011,.011,.008]),mesh(SPH,dark,head,[-.032,.123,.094],[.011,.011,.008])];
+mesh(SPH,skin,head,[0,.102,.1],[.014,.025,.019]);
+mesh(SPH,lip,head,[0,.068,.099],[.022,.006,.007]);
+
+function buildArm(S){
+  const s=S==='L'?1:-1,g={};
+  g.gird=grp(chest,[s*.165,.255,-.008]);
+  g.sh=grp(g.gird);g.sh.rotation.order='XZY';
+  mesh(SPH,gown,g.sh,[s*.01,-.012,0],[.063,.062,.06]);
+  cyl(.054,.048,.14,gown,g.sh,0);
+  cyl(.045,.037,.29,skin,g.sh,0);
+  mesh(SPH,skin,g.sh,[0,-.17,-.004],[.045,.085,.043]);
+  g.elb=grp(g.sh,[0,-.29,0]);mesh(SPH,skin,g.elb,null,[.037,.037,.037]);
+  g.tw=grp(g.elb);
+  cyl(.036,.026,.25,skin,g.tw,0);mesh(SPH,skin,g.tw,[0,-.075,0],[.042,.075,.036]);
+  g.wr=grp(g.tw,[0,-.25,0]);g.wr.rotation.order='XZY';
+  mesh(SPH,skin,g.wr,[0,-.048,0],[.041,.054,.017]);
+  const fx=[.027,.009,-.009,-.026],fl=[.92,1,.95,.78],sp=[.1,.02,-.05,-.12];
+  g.fingers=fx.map((x,i)=>{const L=fl[i];const p=grp(g.wr,[s*x,-.094,0]);mesh(capG(.0088,+(.026*L).toFixed(4)),skin,p,[0,-.021*L,0]);const d=grp(p,[0,-.044*L,0]);mesh(capG(.008,+(.019*L).toFixed(4)),skin,d,[0,-.015*L,0]);return{p,d,spread:s*sp[i]};});
+  g.thumb=grp(g.wr,[s*.034,-.024,.008]);g.thumb.rotation.order='XZY';
+  mesh(capG(.0098,.026),skin,g.thumb,[0,-.02,0]);
+  g.thumbD=grp(g.thumb,[0,-.042,0]);mesh(capG(.0088,.017),skin,g.thumbD,[0,-.013,0]);
+  g.mk=marker(g.gird,S,[s*.01,0,0]);
+  return g;
+}
+function buildLeg(S){
+  const s=S==='L'?1:-1,g={};
+  g.hip=grp(pelvis,[s*HIP_X,HIP_Y,0]);
+  cyl(.09,.075,.21,shorts,g.hip,.045);
+  cyl(.074,.052,A_TH,skin,g.hip,0);
+  g.knee=grp(g.hip,[0,-A_TH,0]);mesh(SPH,skin,g.knee,[0,0,.01],[.053,.054,.05]);
+  cyl(.049,.032,B_SH,skin,g.knee,0);mesh(SPH,skin,g.knee,[0,-.13,-.016],[.052,.105,.05]);
+  g.ank=grp(g.knee,[0,-B_SH,0]);mesh(SPH,skin,g.ank,null,[.034,.036,.036]);
+  mesh(capG(.043,.15),skin,g.ank,[0,-.052,.04],[.92,1,.54],[Math.PI/2,0,0]);
+  g.toe=grp(g.ank,[0,-.054,.15]);mesh(capG(.019,.05),skin,g.toe,[0,-.004,.018],[1,1,.8],[0,0,Math.PI/2]);
+  g.mk=marker(pelvis,S,[s*HIP_X,HIP_Y,.02]);
+  return g;
+}
+
+/* ---------- motion channels ---------- */
+const DEF={base:0,lo:-1,hi:1,rate:0,amp:0,dur:[.2,.6],peak:[.3,.62],omega:18,zeta:.82,ou:0,signBias:0,nb:[]};
+const F=(base,nb)=>({base,lo:-.3,hi:1.45,rate:.42,amp:.5,dur:[.14,.42],omega:32,ou:.05,nb});
+const ARM_DEF={
+  shElev:{base:0,lo:-.02,hi:.07,rate:.2,amp:.02,dur:[.3,.8],omega:16,ou:.002,signBias:.25,nb:['shFlex','shAbd']},
+  shFlex:{base:.06,lo:-.75,hi:2.7,rate:.2,amp:.16,dur:[.3,.8],omega:15,ou:.012,nb:['shAbd','shRot','elb','shElev']},
+  shAbd:{base:.11,lo:.03,hi:2.4,rate:.18,amp:.13,dur:[.3,.8],omega:15,ou:.01,signBias:.15,nb:['shFlex','shRot','shElev']},
+  shRot:{base:0,lo:-1.1,hi:1.1,rate:.22,amp:.24,dur:[.3,.75],omega:16,ou:.015,nb:['shFlex','pro']},
+  elb:{base:.3,lo:.03,hi:2.3,rate:.32,amp:.3,dur:[.25,.7],omega:18,ou:.015,nb:['pro','shFlex','wrF']},
+  pro:{base:1.25,lo:-.3,hi:2.6,rate:.42,amp:.42,dur:[.2,.6],omega:22,ou:.03,nb:['wrF','elb','shRot']},
+  wrF:{base:.14,lo:-1,hi:1.15,rate:.65,amp:.42,dur:[.15,.5],omega:28,ou:.04,nb:['wrD','f0','f1','f2','f3','pro']},
+  wrD:{base:.04,lo:-.3,hi:.45,rate:.45,amp:.2,dur:[.15,.45],omega:28,ou:.025,nb:['wrF','th']},
+  f0:F(.28,['f1','th','wrF']),f1:F(.34,['f0','f2']),f2:F(.4,['f1','f3']),f3:F(.48,['f2','wrD']),
+  th:{base:.22,lo:-.3,hi:1,rate:.38,amp:.35,dur:[.15,.45],omega:30,ou:.04,nb:['f0','wrD']}
+};
+const LEG_DEF={
+  hipRot:{base:0,lo:-.45,hi:.45,rate:.16,amp:.14,dur:[.35,.9],omega:12,ou:.01,nb:['knee','inv']},
+  knee:{base:0,lo:0,hi:.6,rate:.16,amp:.22,dur:[.35,.9],omega:12,signBias:.5,nb:['df','hipRot']},
+  df:{base:0,lo:-.55,hi:.42,rate:.22,amp:.22,dur:[.3,.8],omega:16,ou:.01,nb:['toe','inv']},
+  inv:{base:0,lo:-.22,hi:.38,rate:.22,amp:.15,dur:[.25,.7],omega:18,ou:.01,nb:['toe','df']},
+  toe:{base:0,lo:-.65,hi:.7,rate:.42,amp:.45,dur:[.15,.45],omega:28,ou:.04,nb:['inv','df']}
+};
+const AX_DEF={
+  spF:{base:.03,lo:-.25,hi:.35,rate:.13,amp:.045,dur:[.4,1],omega:9,ou:.004,nb:['nkF','spL']},
+  spL:{base:0,lo:-.3,hi:.3,rate:.16,amp:.05,dur:[.4,1],omega:9,ou:.004,nb:['spR','nkL']},
+  spR:{base:0,lo:-.45,hi:.45,rate:.16,amp:.09,dur:[.4,1],omega:9,ou:.006,nb:['spL','nkR']},
+  nkF:{base:0,lo:-.35,hi:.45,rate:.24,amp:.11,dur:[.25,.8],omega:15,ou:.01,nb:['nkR','nkL']},
+  nkL:{base:0,lo:-.32,hi:.32,rate:.2,amp:.08,dur:[.25,.8],omega:15,ou:.008,nb:['nkR','nkF']},
+  nkR:{base:0,lo:-.6,hi:.6,rate:.24,amp:.14,dur:[.25,.8],omega:15,ou:.012,nb:['nkF','nkL']},
+  pvY:{base:0,lo:-.06,hi:.008,rate:.12,amp:.018,dur:[.4,1],omega:10,signBias:-.5,nb:['spF']},
+  pvObl:{base:0,lo:-.12,hi:.12,rate:.12,amp:.03,dur:[.4,1],omega:10,nb:['spL']},
+  pvYaw:{base:0,lo:-.3,hi:.3,rate:.12,amp:.05,dur:[.4,1],omega:9,nb:['spR']}
+};
+const channels=[];
+function mkCh(name,side,def){const c=Object.assign({},DEF,def,{name,side,events:[],n:0,y:0,v:0,comp:0,cdev:0,next:Math.random()*2.5});c.y=c.base;channels.push(c);return c;}
+function makeSet(defs,side,prefix){const set={};for(const k in defs)set[k]=mkCh(prefix+k,side,defs[k]);for(const k in set)set[k].nbo=set[k].nb.map(n=>set[n]).filter(Boolean);return set;}
+
+const arms={},legs={};
+for(const S of ['L','R']){
+  arms[S]={S,s:S==='L'?1:-1,g:buildArm(S),c:makeSet(ARM_DEF,S,S+'.arm.'),busyUntil:0};
+  const anchor={x:(S==='L'?1:-1)*.11,z:0};
+  legs[S]={S,s:S==='L'?1:-1,g:buildLeg(S),c:makeSet(LEG_DEF,S,S+'.leg.'),anchor,neutral:{...anchor},yaw:(S==='L'?1:-1)*.14,move:null,gx:anchor.x,gz:anchor.z,lift:0,mp:0,w:1};
+}
+const ax=makeSet(AX_DEF,null,'ax.');
+const sideCh={L:channels.filter(c=>c.side==='L'),R:channels.filter(c=>c.side==='R')};
+
+/* ---------- event generators ---------- */
+const pending=[];
+function addEv(c,amp,dur,peak,ball,delay){c.events.push({t0:state.t+(delay||0),amp,dur,peak,ball:!!ball});}
+function chorea(c,depth){
+  const g=gain(c.side);if(g<=.001)return;
+  const sgn=Math.random()<.5+c.signBias?1:-1;
+  addEv(c,sgn*c.amp*g*rand(.45,1.3),rand(c.dur[0],c.dur[1]),rand(c.peak[0],c.peak[1]),false);
+  if(depth<3&&Math.random()<.5){
+    const target=Math.random()<.12?pick(channels):(c.nbo.length?pick(c.nbo):null);
+    if(target)pending.push({t:state.t+rand(.05,.3),fn:()=>{if(chorOn())chorea(target,depth+1);}});
+  }
+}
+function ballEv(c,amp,dur,peak,delay){addEv(c,amp,dur,peak,true,delay);addEv(c,-.14*amp,.38,.4,true,(delay||0)+dur*.82);}
+const ballLog={L:[],R:[]};
+function armBallism(S,manual){
+  const a=arms[S],s=a.s,c=a.c;
+  const g=manual?Math.max(gain(S),S==='L'?1.2:.85):gain(S);
+  if(g<.05||state.t<a.busyUntil)return;
+  const M=g*rand(.72,1.3),th=rand(-.55,2.25),dur=rand(.5,.9),pk=rand(.22,.34);
+  const fl=M*Math.cos(th),ab=M*Math.sin(th)*.9;
+  ballEv(c.shFlex,fl,dur,pk);ballEv(c.shAbd,ab,dur,pk);ballEv(c.shRot,rand(-.6,.6)*M,dur,pk);
+  ballEv(c.shElev,.03*Math.min(M,1.6),dur,pk);
+  ballEv(c.elb,Math.random()<.65?-rand(.12,.28)*M:rand(.25,.6)*M,dur*.95,pk*1.1,.03);
+  ballEv(c.pro,rand(-.7,.7)*M,dur*.8,.35,.07);
+  ballEv(c.wrF,rand(-.8,.8)*M,dur*.65,.35,.09);
+  ballEv(c.wrD,rand(-.3,.3)*M,dur*.6,.35,.1);
+  const spread=-rand(.2,.5)*M;
+  for(const f of ['f0','f1','f2','f3'])ballEv(c[f],spread+rand(-.15,.15),dur*.6,.3,rand(.08,.14));
+  ballEv(c.th,-rand(.1,.4)*M,dur*.6,.3,.1);
+  ballEv(ax.spR,-s*.07*fl+s*.025*ab,dur*1.1,pk*1.2,.05);
+  ballEv(ax.spL,-s*.03*ab,dur*1.1,pk*1.2,.06);
+  a.busyUntil=state.t+dur*.85;
+  flash(a.g.mk);ballLog[S].push(state.t);
+  log(`Ballistic fling · ${S==='L'?'left':'right'} shoulder`,S);
+  if(Math.random()<.32*Math.min(M,1.6))pending.push({t:state.t+rand(.22,.4),fn:reactiveStep});
+}
+function constrain(S,p){
+  const o=legs[other(S)].anchor;
+  const x=S==='L'?clamp(p.x,Math.max(.05,o.x+.13),.27):clamp(p.x,-.27,Math.min(-.05,o.x-.13));
+  return{x,z:clamp(p.z,-.14,.18)};
+}
+function legBallism(S,manual){
+  const L=legs[S],O=legs[other(S)];if(L.move||O.move)return false;
+  const g=manual?Math.max(gain(S),S==='L'?1.2:.85):gain(S);if(g<.05)return false;
+  const s=L.s,ang=rand(-.35,1.25),H=g*rand(.15,.27);
+  L.move={t0:state.t,dur:rand(.6,.95),from:{...L.anchor},to:constrain(S,{x:L.anchor.x+s*rand(-.03,.05),z:L.anchor.z+rand(-.04,.06)}),
+    out:{x:s*Math.sin(ang)*H,z:Math.cos(ang)*H},lift:g*rand(.07,.15),peak:rand(.3,.42),pitch:rand(.15,.45),kind:'fling'};
+  ballEv(L.c.hipRot,rand(-.35,.35)*g,L.move.dur,.35);ballEv(L.c.toe,rand(-.5,.4)*g,L.move.dur*.6,.35,.08);
+  ballEv(L.c.inv,rand(-.1,.25)*g,L.move.dur*.7,.35,.05);
+  flash(L.g.mk);ballLog[S].push(state.t);
+  log(`Ballistic fling · ${S==='L'?'left':'right'} hip`,S);
+  return true;
+}
+function smallStep(S,kind,d){
+  const L=legs[S],O=legs[other(S)];if(L.move||O.move)return false;
+  const corr=kind==='corrective';
+  L.move={t0:state.t,dur:corr?rand(.55,.75):rand(.35,.55),from:{...L.anchor},to:constrain(S,{x:L.anchor.x+d.x,z:L.anchor.z+d.z}),
+    out:{x:0,z:0},lift:corr?rand(.025,.04):rand(.012,.03),peak:rand(.4,.5),pitch:.12,kind};
+  return true;
+}
+let mxF=0,mzF=0;
+function reactiveStep(){
+  const S=mxF>=0?'L':'R';
+  if(smallStep(S,'reactive',{x:legs[S].s*rand(.03,.07),z:rand(-.03,.06)}))log(`Reactive balance step · ${S==='L'?'left':'right'} foot`,S);
+}
+
+/* ---------- simulation step ---------- */
+const H=1/240;
+const nextBall={armL:rand(1,3),armR:rand(3,6),legL:rand(5,10),legR:rand(8,14)};
+const nextShift={L:rand(3,8),R:rand(3,8)};
+const P={x:0,z:.02,vx:0,vz:0,cx:0,cz:0};
+function ballRate(kind,S){const base=kind==='arm'?.085:.028;const k=kind==='arm'?1.4:1;return base*Math.pow(Math.max(state.sev,.08),1.3)*(S==='L'?1+k*state.asym:1);}
+function legGround(L,t){
+  if(L.move){
+    const m=L.move,u=(t-m.t0)/m.dur;
+    if(u>=1){L.anchor.x=m.to.x;L.anchor.z=m.to.z;L.move=null;}
+    else{const e=smoother(clamp((u-.06)/.88,0,1)),b=bump(u,m.peak);
+      L.gx=m.from.x+(m.to.x-m.from.x)*e+m.out.x*b;L.gz=m.from.z+(m.to.z-m.from.z)*e+m.out.z*b;
+      L.lift=m.lift*bump(u,m.peak*.85);L.mp=m.pitch*b;L.w=1-smoothstep(.004,.022,L.lift);return;}
+  }
+  L.gx=L.anchor.x;L.gz=L.anchor.z;L.lift=0;L.mp=0;L.w=1;
+}
+function substep(){
+  state.t+=H;const t=state.t,cOn=chorOn();
+  for(let i=pending.length-1;i>=0;i--){if(t>=pending[i].t){const f=pending[i].fn;pending.splice(i,1);f();}}
+  for(const c of channels){
+    if(t>=c.next){if(cOn&&state.sev>.01&&c.rate>0)chorea(c,0);c.next=t+expo(c.rate*Math.sqrt(Math.max(state.sev,.05)));}
+    const g=gain(c.side),sig=cOn?c.ou*g:0;
+    c.n+=-c.n/.5*H+sig*Math.sqrt(2*H/.5)*randn();
+    let sumC=0,sumB=0;
+    for(const e of c.events){const v=e.amp*bump((t-e.t0)/e.dur,e.peak);if(e.ball)sumB+=v;else sumC+=v;}
+    c.cdev=(sumC+c.n)/(c.amp||1);
+    const x=softClamp(c.base+c.n+c.comp+sumC+sumB,c.lo,c.hi);
+    const w=c.omega;c.v+=(w*w*(x-c.y)-2*c.zeta*w*c.v)*H;c.y+=c.v*H;
+  }
+  for(const S of ['L','R']){
+    const kA='arm'+S,kL='leg'+S;
+    if(t>=nextBall[kA]){if(ballOn()&&state.sev>.05)armBallism(S);nextBall[kA]=t+Math.max(.7,expo(ballRate('arm',S)));}
+    if(t>=nextBall[kL]){if(ballOn()&&state.sev>.05)legBallism(S);nextBall[kL]=t+Math.max(1.5,expo(ballRate('leg',S)));}
+    if(t>=nextShift[S]){if(cOn&&state.sev>.05)smallStep(S,'restless',{x:rand(-.04,.04),z:rand(-.04,.04)});nextShift[S]=t+expo(.045*Math.max(gain(S),.1));}
+    const L=legs[S];
+    if(!legs.L.move&&!legs.R.move&&Math.hypot(L.anchor.x-L.neutral.x,L.anchor.z-L.neutral.z)>.045&&Math.random()<H*.4){
+      const k=rand(.6,.9);smallStep(S,'corrective',{x:(L.neutral.x-L.anchor.x)*k,z:(L.neutral.z-L.anchor.z)*k});
+    }
+    legGround(L,t);
+  }
+  const lL=legs.L,lR=legs.R,ws=lL.w+lR.w+1e-6;
+  const midx=(lL.gx+lR.gx)/2,midz=(lL.gz+lR.gz)/2;
+  const cx=(lL.w*lL.gx+lR.w*lR.gx)/ws,cz=(lL.w*lL.gz+lR.w*lR.gz)/ws;
+  const tx=midx+(cx-midx)*.85+P.cx,tz=midz+.02+(cz-midz)*.6+P.cz;
+  const pw=6.5,pzeta=.72;
+  P.vx+=(pw*pw*(tx-P.x)-2*pzeta*pw*P.vx)*H;P.x+=P.vx*H;
+  P.vz+=(pw*pw*(tz-P.z)-2*pzeta*pw*P.vz)*H;P.z+=P.vz*H;
+}
+
+/* ---------- apply pose ---------- */
+const V=()=>new T.Vector3();
+const _t=V(),_u=V(),_pp=V(),_K=V(),_Tc=V(),_X=V(),_Y=V(),_Z=V(),_sh=V(),_tmp=V(),_g=V(),_piv=V(),_r0=V();
+const _m=new T.Matrix4(),_q=new T.Quaternion(),_qi=new T.Quaternion(),_qd=new T.Quaternion(),_e=new T.Euler(0,0,0,'YXZ');
+function solveLeg(L){
+  const s=L.s,c=L.c,g=L.g;
+  const yaw=L.yaw+c.hipRot.y*(1-L.w)*.8;
+  const pitch=-c.df.y+L.mp,roll=-s*c.inv.y;
+  _e.set(pitch,yaw,roll,'YXZ');_qd.setFromEuler(_e);
+  _g.set(L.gx,0,L.gz);
+  const piv=pitch>0?BALL:-HEEL;
+  _piv.set(0,0,piv).applyAxisAngle(_Y.set(0,1,0),yaw);
+  _r0.set(0,ANK,-piv).applyAxisAngle(_X.set(1,0,0),pitch).applyAxisAngle(_Y.set(0,1,0),yaw);
+  _t.copy(_g).add(_piv).add(_r0);
+  _tmp.set(L.gx,ANK+L.lift,L.gz);
+  _t.lerp(_tmp,1-L.w);
+  pelvis.worldToLocal(_t);
+  const Hp=g.hip.position;
+  _u.copy(_t).sub(Hp);
+  const d=clamp(_u.length(),.3,(A_TH+B_SH)*.9993);
+  _u.normalize();
+  const ra=s*c.hipRot.y+s*.08;
+  _pp.set(Math.sin(ra),0,Math.cos(ra));
+  _pp.addScaledVector(_u,-_pp.dot(_u));
+  if(_pp.lengthSq()<1e-6)_pp.set(0,0,1);_pp.normalize();
+  const cosA=clamp((A_TH*A_TH+d*d-B_SH*B_SH)/(2*A_TH*d),-1,1),sinA=Math.sqrt(1-cosA*cosA);
+  _K.copy(Hp).addScaledVector(_u,A_TH*cosA).addScaledVector(_pp,A_TH*sinA);
+  _Tc.copy(Hp).addScaledVector(_u,d);
+  _Y.copy(_K).sub(Hp).normalize().negate();
+  _Z.copy(_pp).addScaledVector(_Y,-_pp.dot(_Y)).normalize();
+  _X.crossVectors(_Y,_Z);
+  _m.makeBasis(_X,_Y,_Z);g.hip.quaternion.setFromRotationMatrix(_m);
+  _sh.copy(_Tc).sub(_K).applyQuaternion(_qi.copy(g.hip.quaternion).invert());
+  g.knee.rotation.set(Math.atan2(-_sh.z,-_sh.y),0,0);
+  g.knee.updateMatrixWorld(true);
+  g.knee.getWorldQuaternion(_q);
+  g.ank.quaternion.copy(_q.invert().multiply(_qd));
+  let toe=c.toe.y-Math.max(0,pitch)*L.w;
+  if(L.w>.5)toe=Math.min(toe,.25);
+  g.toe.rotation.x=toe;
+}
+function applyArm(a){
+  const c=a.c,g=a.g,s=a.s;
+  g.gird.position.y=.255+c.shElev.y;
+  g.sh.rotation.set(-c.shFlex.y,s*c.shRot.y,s*c.shAbd.y);
+  g.elb.rotation.x=-c.elb.y;
+  g.tw.rotation.y=-s*c.pro.y;
+  g.wr.rotation.set(-c.wrF.y,0,s*c.wrD.y);
+  const fs=[c.f0,c.f1,c.f2,c.f3];
+  g.fingers.forEach((f,i)=>{const k=fs[i].y;f.p.rotation.set(-k,0,f.spread*(1-clamp(k,0,1)*.6));f.d.rotation.x=-k*1.05;});
+  g.thumb.rotation.set(-.35-c.th.y*.4,0,s*(.55-c.th.y*.75));
+  g.thumbD.rotation.x=-c.th.y*.6;
+}
+function applyRig(){
+  let py=PELV_Y+ax.pvY.y;
+  const Rr=(A_TH+B_SH)*.992;
+  for(const S of ['L','R']){const L=legs[S];if(L.w<.3)continue;
+    const hx=P.x+L.s*HIP_X*Math.cos(ax.pvYaw.y),hz=P.z-L.s*HIP_X*Math.sin(ax.pvYaw.y);
+    const hd=Math.hypot(L.gx-hx,L.gz-hz),lim=ANK+Math.sqrt(Math.max(Rr*Rr-hd*hd,.25))-HIP_Y;
+    py=Math.min(py,lim-.004);}
+  pelvis.position.set(P.x,py,P.z);
+  pelvis.rotation.set(.025,ax.pvYaw.y,ax.pvObl.y);
+  spine.rotation.set(ax.spF.y*.5,ax.spR.y*.5,ax.spL.y*.5);
+  chest.rotation.set(ax.spF.y*.5,ax.spR.y*.5,ax.spL.y*.5);
+  neck.rotation.set(ax.nkF.y*.45,ax.nkR.y*.45,ax.nkL.y*.45);
+  head.rotation.set(ax.nkF.y*.55,ax.nkR.y*.55,ax.nkL.y*.55);
+  applyArm(arms.L);applyArm(arms.R);
+  root.updateMatrixWorld(true);
+  solveLeg(legs.L);solveLeg(legs.R);
+}
+
+/* ---------- postural compensation (reactive, lagged) ---------- */
+const rest={};
+const _c=V(),_h=V(),_el=V();
+function armRel(S){chest.getWorldPosition(_c);arms[S].g.wr.getWorldPosition(_h);arms[S].g.elb.getWorldPosition(_el);return{hx:_h.x-_c.x,hz:_h.z-_c.z,ex:_el.x-_c.x,ez:_el.z-_c.z};}
+function captureRest(){for(const S of ['L','R'])rest[S]=armRel(S);}
+function compensate(dt){
+  let mx=0,mz=0;
+  for(const S of ['L','R']){const r=armRel(S),r0=rest[S];mx+=(r.hx-r0.hx)*.6+(r.ex-r0.ex)*.4;mz+=(r.hz-r0.hz)*.6+(r.ez-r0.ez)*.4;}
+  const k=Math.min(1,dt/.14);mxF+=(mx-mxF)*k;mzF+=(mz-mzF)*k;
+  const lL=legs.L,lR=legs.R;
+  ax.spL.comp=.17*mxF+.07*(lR.w-lL.w);
+  ax.spF.comp=-.13*mzF;
+  ax.nkL.comp=-.75*ax.spL.y;ax.nkR.comp=-.55*ax.spR.y-.5*ax.pvYaw.y;ax.nkF.comp=-.5*ax.spF.y;
+  const kL=lL.c.knee.y,kR=lR.c.knee.y;
+  ax.pvObl.comp=-.13*kL+.13*kR+.3*(lL.lift-lR.lift);
+  ax.pvY.comp=-.03*(kL+kR);
+  lL.c.df.comp=-.4*kL;lR.c.df.comp=-.4*kR;
+  P.cx=-.07*mxF;P.cz=-.05*mzF;
+}
+
+/* ---------- camera ---------- */
+const cam={az:0,el:.07,azT:0,elT:.07,zoom:1,auto:false};
+const VIEWS={front:[0,'Frontal view'],left:[Math.PI/2,'Left lateral view'],right:[-Math.PI/2,'Right lateral view'],oblique:[Math.PI/4,'Left anterior oblique']};
+function setView(k){const v=VIEWS[k];let d=v[0]-cam.azT;d=Math.atan2(Math.sin(d),Math.cos(d));cam.azT+=d;cam.elT=.07;$('viewChip').textContent=v[1];
+  document.querySelectorAll('#views .btn').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===k?'true':'false'));}
+function customView(){$('viewChip').textContent='Custom view';document.querySelectorAll('#views .btn').forEach(b=>b.setAttribute('aria-pressed','false'));}
+let aspect=1;
+function placeCamera(dt){
+  if(cam.auto)cam.azT+=dt*.28;
+  const k=Math.min(1,dt*5);cam.az+=(cam.azT-cam.az)*k;cam.el+=(cam.elT-cam.el)*k;
+  const tf=Math.tan(15*Math.PI/180);
+  const r=Math.max(1.16/tf,.9/(tf*aspect))*cam.zoom;
+  const tx=P.x*.5,ty=.9;
+  camera.position.set(tx+r*Math.cos(cam.el)*Math.sin(cam.az),ty+r*Math.sin(cam.el),r*Math.cos(cam.el)*Math.cos(cam.az));
+  camera.lookAt(tx,ty,0);
+}
+const ptrs=new Map();let pinch0=0,zoom0=1;
+const cv=renderer.domElement;
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y);zoom0=cam.zoom;}});
+cv.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;
+  if(ptrs.size===1){const dx=e.clientX-p.x,dy=e.clientY-p.y;if(Math.abs(dx)+Math.abs(dy)>0){cam.azT-=dx*.009;cam.elT=clamp(cam.elT+dy*.005,-.12,.95);customView();}}
+  p.x=e.clientX;p.y=e.clientY;
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch0>0)cam.zoom=clamp(zoom0*pinch0/d,.5,1.9);}});
+const endPtr=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch0=0;};
+cv.addEventListener('pointerup',endPtr);cv.addEventListener('pointercancel',endPtr);
+cv.addEventListener('wheel',e=>{e.preventDefault();cam.zoom=clamp(cam.zoom*Math.exp(e.deltaY*.0012),.5,1.9);},{passive:false});
+
+/* ---------- theme ---------- */
+const col={};
+function readTheme(){
+  const cs=getComputedStyle(document.documentElement);const g=n=>cs.getPropertyValue(n).trim();
+  Object.assign(col,{left:g('--left'),right:g('--right'),line:g('--line'),muted:g('--muted'),ink:g('--ink')});
+  try{scene.background.set(g('--scene-bg'));floorMat.color.set(g('--floor'));lineMat.color.set(g('--floor-line'));}catch(_){}
+  for(const m of markers)m.material.color.set(m.userData.S==='L'?col.left:col.right);
+}
+if(window.matchMedia)window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readTheme);
+new MutationObserver(readTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ---------- UI ---------- */
+function flash(m){m.userData.life=1;}
+const logItems=[];
+function fmt(t){const m=Math.floor(t/60),s=t-m*60;return String(m).padStart(2,'0')+':'+s.toFixed(1).padStart(4,'0');}
+function log(text,S){logItems.unshift({t:state.t,text,S});if(logItems.length>5)logItems.length=5;
+  $('log').innerHTML=logItems.map(i=>`<li><span class="t">${fmt(i.t)}</span><span class="${i.S}">${i.text}</span></li>`).join('');}
+function sevLabel(v){return v<.05?'Off':v<.55?'Mild':v<1.15?'Moderate':'Severe';}
+function syncLabels(){
+  $('sevOut').textContent=`${sevLabel(state.sev)} · ${state.sev.toFixed(2)}`;
+  const pct=Math.round(state.asym*100);
+  $('asymOut').textContent=pct===0?'Symmetric':`L ${pct}% greater`;
+  $('ratioTarget').textContent=(1+state.asym).toFixed(2);
+  $('speedOut').textContent=state.speed.toFixed(2)+'×';
+}
+$('sev').addEventListener('input',e=>{state.sev=+e.target.value;syncLabels();});
+$('asym').addEventListener('input',e=>{state.asym=+e.target.value/100;syncLabels();});
+$('speed').addEventListener('input',e=>{state.speed=+e.target.value;syncLabels();});
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',e=>{state.mode=e.target.value;}));
+function setPaused(p){state.paused=p;const t=p?'Resume':'Pause';$('pauseBtn').textContent=t;$('fab').textContent=t;}
+$('pauseBtn').addEventListener('click',()=>setPaused(!state.paused));
+$('fab').addEventListener('click',()=>setPaused(!state.paused));
+$('flingL').addEventListener('click',()=>{if(state.paused)setPaused(false);armBallism('L',true);});
+$('flingR').addEventListener('click',()=>{if(state.paused)setPaused(false);armBallism('R',true);});
+$('marks').addEventListener('change',e=>{state.marks=e.target.checked;});
+$('autorot').addEventListener('change',e=>{cam.auto=e.target.checked;if(cam.auto)customView();});
+document.querySelectorAll('#views .btn').forEach(b=>b.addEventListener('click',()=>{cam.auto=false;$('autorot').checked=false;setView(b.dataset.view);}));
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&!/INPUT|BUTTON|TEXTAREA/.test(e.target.tagName)){e.preventDefault();setPaused(!state.paused);}});
+
+/* ---------- measures ---------- */
+const N=300,bufL=new Float32Array(N),bufR=new Float32Array(N);let bi=0,nextSample=0;
+let msL=0,msR=0,emaInit=false;
+const chart=$('chart'),cx2=chart.getContext('2d');
+function measure(dt){
+  let aL=0,aR=0,dL=0,dR=0;
+  for(const c of sideCh.L){aL+=Math.abs(c.v);dL+=c.cdev*c.cdev;}
+  for(const c of sideCh.R){aR+=Math.abs(c.v);dR+=c.cdev*c.cdev;}
+  dL/=sideCh.L.length;dR/=sideCh.R.length;
+  if(!emaInit){msL=dL;msR=dR;emaInit=true;}
+  const k=Math.min(1,dt/12);msL+=(dL-msL)*k;msR+=(dR-msR)*k;
+  if(state.t>=nextSample){bufL[bi]=aL;bufR[bi]=aR;bi=(bi+1)%N;nextSample=state.t+1/30;}
+}
+function drawChart(){
+  const dpr=Math.min(window.devicePixelRatio||1,2),w=chart.clientWidth,h=chart.clientHeight;
+  if(chart.width!==Math.round(w*dpr)||chart.height!==Math.round(h*dpr)){chart.width=Math.round(w*dpr);chart.height=Math.round(h*dpr);}
+  const c=cx2;c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
+  let mx=4;for(let i=0;i<N;i++){if(bufL[i]>mx)mx=bufL[i];if(bufR[i]>mx)mx=bufR[i];}mx*=1.08;
+  const padB=14;
+  c.strokeStyle=col.line;c.lineWidth=1;c.beginPath();
+  for(let i=0;i<=3;i++){const y=Math.round((h-padB)*i/3)+.5;c.moveTo(0,y);c.lineTo(w,y);}c.stroke();
+  c.fillStyle=col.muted;c.font='10px "IBM Plex Mono", monospace';c.textBaseline='bottom';
+  c.textAlign='left';c.fillText('−10 s',0,h);c.textAlign='right';c.fillText('now',w,h);
+  c.textAlign='left';c.textBaseline='top';c.fillText(mx.toFixed(0)+' rad/s',2,2);
+  for(const [buf,color] of [[bufR,col.right],[bufL,col.left]]){
+    c.strokeStyle=color;c.lineWidth=1.5;c.lineJoin='round';c.beginPath();
+    for(let i=0;i<N;i++){const v=buf[(bi+i)%N],x=i/(N-1)*w,y=(h-padB)*(1-v/mx);i?c.lineTo(x,y):c.moveTo(x,y);}c.stroke();
+  }
+}
+let uiTimer=0;
+function updateUI(dt){
+  uiTimer+=dt;if(uiTimer<.25)return;uiTimer=0;
+  $('ratio').textContent=state.t<8||state.sev<.05||msR<1e-6||!chorOn()?'—':Math.sqrt(msL/msR).toFixed(2);
+  for(const S of ['L','R']){const a=ballLog[S];while(a.length&&state.t-a[0]>60)a.shift();$('cnt'+S).textContent=a.length;}
+  $('clock').textContent='t = '+state.t.toFixed(1)+' s';
+}
+
+/* ---------- side labels ---------- */
+const tagP={L:new T.Vector3(.55,.04,.3),R:new T.Vector3(-.55,.04,.3)};
+function placeTags(){
+  const w=stage.clientWidth,h=stage.clientHeight;
+  for(const S of ['L','R']){const el=$('tag'+S);_tmp.copy(tagP[S]).project(camera);
+    if(_tmp.z>1||Math.abs(_tmp.x)>1.1){el.hidden=true;continue;}el.hidden=false;
+    el.style.transform=`translate(${((_tmp.x+1)/2*w).toFixed(1)}px,${((1-_tmp.y)/2*h).toFixed(1)}px) translate(-50%,-50%)`;}
+}
+
+/* ---------- loop ---------- */
+function resize(){const r=stage.getBoundingClientRect();renderer.setSize(Math.max(1,r.width),Math.max(1,r.height),false);aspect=r.width/Math.max(1,r.height);camera.aspect=aspect;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage);resize();
+let blinkAt=rand(1,4),blinkT=0;
+function frame(simDt,dt){
+  const n=Math.round(simDt/H);for(let i=0;i<n;i++)substep();
+  for(const c of channels){if(c.events.length)c.events=c.events.filter(e=>state.t<e.t0+e.dur);}
+  applyRig();compensate(simDt);if(simDt>0)measure(simDt);
+  for(const m of markers){const u=m.userData;if(u.life>0)u.life=Math.max(0,u.life-dt/1.15);m.material.opacity=state.marks?.9*u.life*u.life:0;m.scale.setScalar(1+(1-u.life)*.9);m.visible=m.material.opacity>.01;}
+  blinkT+=dt;if(blinkT>blinkAt){const p=(blinkT-blinkAt)/.14;const s=p<1?Math.abs(1-2*p)*.9+.1:1;eyes.forEach(e=>e.scale.y=.011*s);if(p>=1){blinkT=0;blinkAt=rand(2,6);}}
+}
+applyRig();captureRest();
+for(let i=0;i<30;i++)frame(1/15,1/60);
+readTheme();syncLabels();
+if(reduceMotion)setPaused(true);
+let last=performance.now(),acc=0;
+function loop(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(!state.paused){acc+=dt*state.speed;const steps=Math.floor(acc/H);acc-=steps*H;frame(steps*H,dt);}
+  else frame(0,dt);
+  placeCamera(dt);renderer.render(scene,camera);placeTags();drawChart();updateUI(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
