@@ -1,6 +1,6 @@
 # Chorea-Ballismus-Sim
 3D Simulated model of chorea-ballismus 
-Copyright (c) 2026 Terence Tsang, DO. All rights reserved.
+Copyright (c) 2026 Terence Tsang, DO; Donatine Afful, DO; Yassine Lahlou, DO; Beverly Roberts-Atwater, DO, PhD. All rights reserved.
 
 This repository and its contents, including source code, 3D models,
 and associated assets, are the property of the copyright holder.
